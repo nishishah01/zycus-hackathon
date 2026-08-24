@@ -7,7 +7,7 @@ function App() {
   const [pricingSuggestions, setPricingSuggestions] = useState([]);
   const [reorderSuggestions, setReorderSuggestions] = useState([]);
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingId, setLoadingId] = useState(null);
 
   const loadData = async () => {
     try {
@@ -34,8 +34,13 @@ function App() {
     loadData();
   }, []);
 
+  // -----------------------------
+  // SIMULATE SALE
+  // -----------------------------
+
   const orderProduct = async (id) => {
-    setLoading(true);
+    setLoadingId(id);
+    setMessage("");
 
     try {
       const response = await fetch(
@@ -50,17 +55,26 @@ function App() {
       }
 
       setMessage(
-        "Order completed. Inventory updated successfully."
+        "Sale recorded. Inventory signal sent to the recommendation engine."
       );
+
+      // Give @Async listener a moment to generate suggestions
+      await new Promise((resolve) => setTimeout(resolve, 700));
 
       await loadData();
     } catch (error) {
       console.error(error);
-      setMessage("Order failed.");
+      setMessage("Sale could not be processed.");
     } finally {
-      setLoading(false);
+      setLoadingId(null);
     }
   };
+
+  // -----------------------------
+  // MANUAL ACTIONS
+  // Kept for API/demo purposes,
+  // but hidden under manual controls.
+  // -----------------------------
 
   const suggestPricing = async (id) => {
     try {
@@ -75,7 +89,7 @@ function App() {
         throw new Error("Pricing suggestion failed");
       }
 
-      setMessage("Pricing suggestion generated.");
+      setMessage("Manual pricing suggestion generated.");
       await loadData();
     } catch (error) {
       console.error(error);
@@ -96,13 +110,17 @@ function App() {
         throw new Error("Reorder suggestion failed");
       }
 
-      setMessage("Reorder suggestion generated.");
+      setMessage("Manual reorder suggestion generated.");
       await loadData();
     } catch (error) {
       console.error(error);
       setMessage("Could not generate reorder suggestion.");
     }
   };
+
+  // -----------------------------
+  // APPROVAL ACTIONS
+  // -----------------------------
 
   const updatePricing = async (id, accept) => {
     try {
@@ -119,7 +137,7 @@ function App() {
 
       setMessage(
         accept
-          ? "Pricing recommendation accepted."
+          ? "Pricing recommendation accepted. Product price updated."
           : "Pricing recommendation rejected."
       );
 
@@ -145,7 +163,7 @@ function App() {
 
       setMessage(
         accept
-          ? "Reorder recommendation accepted."
+          ? "Reorder recommendation accepted. Inventory updated."
           : "Reorder recommendation rejected."
       );
 
@@ -155,6 +173,10 @@ function App() {
       setMessage("Could not update reorder recommendation.");
     }
   };
+
+  // -----------------------------
+  // FILTERS
+  // -----------------------------
 
   const pendingPricing = pricingSuggestions.filter(
     (s) => s.status === "PENDING"
@@ -175,27 +197,66 @@ function App() {
   const pendingCount =
     pendingPricing.length + pendingReorder.length;
 
-  const triggerLabel = (triggerReason) => {
-    if (triggerReason === "INVENTORY_LOW") {
-      return "AUTO · INVENTORY LOW";
-    }
+  // -----------------------------
+  // TRIGGER BADGES
+  // -----------------------------
 
-    if (triggerReason === "DEMAND_SPIKE") {
-      return "AUTO · DEMAND SPIKE";
+  const getTriggerType = (triggerReason) => {
+    if (
+      triggerReason === "INVENTORY_LOW" ||
+      triggerReason === "DEMAND_SPIKE"
+    ) {
+      return "AUTO";
     }
 
     return "MANUAL";
   };
 
+  const getTriggerLabel = (triggerReason) => {
+    switch (triggerReason) {
+      case "INVENTORY_LOW":
+        return "INVENTORY LOW";
+
+      case "DEMAND_SPIKE":
+        return "DEMAND SPIKE";
+
+      case "MANUAL":
+        return "MANUAL";
+
+      default:
+        return triggerReason || "UNKNOWN";
+    }
+  };
+
+  const TriggerBadges = ({ triggerReason }) => {
+    const type = getTriggerType(triggerReason);
+    const label = getTriggerLabel(triggerReason);
+
+    return (
+      <div className="trigger-badges">
+        <span className={`badge ${type.toLowerCase()}`}>
+          {type}
+        </span>
+
+        <span className="badge trigger-badge">
+          {label}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div className="app">
 
-      {/* HEADER */}
+      {/* ================= HEADER ================= */}
 
       <header className="hero">
         <div>
           <h1>StockPulse</h1>
-          <p>AI-powered merchandising console</p>
+
+          <p>
+            AI-powered merchandising advisor
+          </p>
         </div>
 
         <div className="header-badge">
@@ -203,7 +264,7 @@ function App() {
         </div>
       </header>
 
-      {/* MESSAGE */}
+      {/* ================= MESSAGE ================= */}
 
       {message && (
         <div className="message">
@@ -211,110 +272,207 @@ function App() {
         </div>
       )}
 
-      {/* INVENTORY */}
+      {/* ================= INVENTORY ================= */}
 
       <section>
+
         <div className="section-header">
+
           <div>
             <h2>Inventory</h2>
-            <p>Live product inventory and demand signals</p>
+
+            <p>
+              Simulate a sale and let StockPulse
+              automatically detect inventory signals.
+            </p>
           </div>
+
         </div>
 
         <div className="product-grid">
 
-          {products.map((product) => (
+          {products.map((product) => {
 
-            <div className="card product-card" key={product.id}>
+            const lowStock =
+              product.stockLevel <
+              product.reorderThreshold;
 
-              <div className="product-top">
+            const demandSpike =
+              product.demandVelocity >= 10;
 
-                <div>
-                  <h3>{product.name}</h3>
+            return (
+              <div
+                className="card product-card"
+                key={product.id}
+              >
 
-                  <p className="sku">
-                    {product.sku}
-                  </p>
+                <div className="product-top">
+
+                  <div>
+                    <h3>
+                      {product.name}
+                    </h3>
+
+                    <p className="sku">
+                      {product.sku}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`status ${product.status}`}
+                  >
+                    {product.status.replaceAll(
+                      "_",
+                      " "
+                    )}
+                  </span>
+
                 </div>
 
-                <span
-                  className={`status ${product.status}`}
-                >
-                  {product.status.replaceAll("_", " ")}
-                </span>
-
-              </div>
-
-              <div className="product-price">
-                ₹{product.currentPrice.toLocaleString("en-IN")}
-              </div>
-
-              <div className="stats">
-
-                <div>
-                  <span>Stock</span>
-                  <strong>{product.stockLevel}</strong>
+                <div className="product-price">
+                  ₹
+                  {Number(
+                    product.currentPrice
+                  ).toLocaleString("en-IN")}
                 </div>
 
-                <div>
-                  <span>Threshold</span>
-                  <strong>{product.reorderThreshold}</strong>
+                <div className="stats">
+
+                  <div>
+                    <span>Stock</span>
+
+                    <strong
+                      className={
+                        lowStock
+                          ? "danger-number"
+                          : ""
+                      }
+                    >
+                      {product.stockLevel}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Threshold</span>
+
+                    <strong>
+                      {product.reorderThreshold}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Demand</span>
+
+                    <strong
+                      className={
+                        demandSpike
+                          ? "danger-number"
+                          : ""
+                      }
+                    >
+                      {product.demandVelocity}
+                    </strong>
+                  </div>
+
                 </div>
 
-                <div>
-                  <span>Demand</span>
-                  <strong>{product.demandVelocity}</strong>
-                </div>
+                {/* SIGNALS */}
 
-              </div>
+                {(lowStock || demandSpike) && (
+                  <div className="signals">
 
-              <div className="buttons">
+                    {lowStock && (
+                      <span className="signal low">
+                        ⚠ Inventory Low
+                      </span>
+                    )}
+
+                    {demandSpike && (
+                      <span className="signal spike">
+                        ↑ Demand Spike
+                      </span>
+                    )}
+
+                  </div>
+                )}
+
+                {/* MAIN DEMO ACTION */}
 
                 <button
-                  onClick={() => orderProduct(product.id)}
-                  disabled={loading}
-                >
-                  {loading ? "Processing..." : "Order 1"}
-                </button>
-
-                <button
-                  className="secondary"
+                  className="simulate-button"
                   onClick={() =>
-                    suggestPricing(product.id)
+                    orderProduct(product.id)
+                  }
+                  disabled={
+                    loadingId === product.id
                   }
                 >
-                  Suggest Pricing
+                  {loadingId === product.id
+                    ? "Processing Sale..."
+                    : "🛒 Simulate Sale"}
                 </button>
 
-                <button
-                  className="secondary"
-                  onClick={() =>
-                    suggestReorder(product.id)
-                  }
-                >
-                  Suggest Reorder
-                </button>
+                <p className="demo-hint">
+                  Sale → inventory event → AI
+                  recommendation
+                </p>
+
+                {/* MANUAL CONTROLS */}
+
+                <details className="manual-controls">
+                  <summary>
+                    Manual controls
+                  </summary>
+
+                  <div className="buttons">
+
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        suggestPricing(
+                          product.id
+                        )
+                      }
+                    >
+                      Suggest Pricing
+                    </button>
+
+                    <button
+                      className="secondary"
+                      onClick={() =>
+                        suggestReorder(
+                          product.id
+                        )
+                      }
+                    >
+                      Suggest Reorder
+                    </button>
+
+                  </div>
+                </details>
 
               </div>
-
-            </div>
-
-          ))}
+            );
+          })}
 
         </div>
+
       </section>
 
-      {/* PENDING RECOMMENDATIONS */}
+      {/* ================= PENDING ================= */}
 
       <section>
 
         <div className="section-header">
 
           <div>
-            <h2>Pending Recommendations</h2>
+            <h2>
+              Pending Recommendations
+            </h2>
 
             <p>
-              AI recommendations waiting for merchandising approval
+              AI recommendations waiting for
+              merchandising approval
             </p>
           </div>
 
@@ -326,18 +484,24 @@ function App() {
 
         {pendingCount === 0 && (
           <div className="empty-state">
-            <div className="empty-icon">✓</div>
 
-            <h3>No pending recommendations</h3>
+            <div className="empty-icon">
+              ✓
+            </div>
+
+            <h3>
+              No pending recommendations
+            </h3>
 
             <p>
-              Your inventory is currently waiting for a
-              recommendation trigger.
+              Simulate a sale to trigger the
+              recommendation engine.
             </p>
+
           </div>
         )}
 
-        {/* PRICING */}
+        {/* ================= PRICING ================= */}
 
         {pendingPricing.length > 0 && (
           <div className="recommendation-group">
@@ -346,118 +510,137 @@ function App() {
               💰 Pricing Recommendations
             </h3>
 
-            {pendingPricing.map((suggestion) => (
+            {pendingPricing.map(
+              (suggestion) => (
 
-              <div
-                className="suggestion recommendation-card"
-                key={suggestion.id}
-              >
+                <div
+                  className="suggestion recommendation-card"
+                  key={suggestion.id}
+                >
 
-                <div className="recommendation-header">
+                  <div className="recommendation-header">
 
-                  <div>
-                    <h3>
-                      {suggestion.product.name}
-                    </h3>
+                    <div>
 
-                    <span className="trigger">
-                      {triggerLabel(
-                        suggestion.triggerReason
-                      )}
+                      <h3>
+                        {suggestion.product.name}
+                      </h3>
+
+                      <TriggerBadges
+                        triggerReason={
+                          suggestion.triggerReason
+                        }
+                      />
+
+                    </div>
+
+                    <span className="pending-label">
+                      PENDING
                     </span>
+
                   </div>
 
-                  <span className="pending-label">
-                    PENDING
-                  </span>
+                  <div className="price-comparison">
 
-                </div>
+                    <div>
+                      <span>
+                        Current price
+                      </span>
 
-                <div className="price-comparison">
+                      <strong>
+                        ₹
+                        {Number(
+                          suggestion.currentPrice
+                        ).toLocaleString(
+                          "en-IN"
+                        )}
+                      </strong>
+                    </div>
 
-                  <div>
-                    <span>Current price</span>
+                    <div className="arrow">
+                      →
+                    </div>
 
-                    <strong>
-                      ₹
-                      {suggestion.currentPrice.toLocaleString(
-                        "en-IN"
-                      )}
-                    </strong>
+                    <div>
+                      <span>
+                        AI recommended
+                      </span>
+
+                      <strong className="recommended">
+                        ₹
+                        {Number(
+                          suggestion.recommendedPrice
+                        ).toLocaleString(
+                          "en-IN"
+                        )}
+                      </strong>
+                    </div>
+
                   </div>
-
-                  <div className="arrow">
-                    →
-                  </div>
-
-                  <div>
-                    <span>AI recommended</span>
-
-                    <strong className="recommended">
-                      ₹
-                      {suggestion.recommendedPrice.toLocaleString(
-                        "en-IN"
-                      )}
-                    </strong>
-                  </div>
-
-                </div>
-
-                <p>
-                  <b>Direction:</b>{" "}
-                  {suggestion.direction}
-                </p>
-
-                <div className="confidence">
-                  Confidence:{" "}
-                  <strong>
-                    {(suggestion.confidence * 100).toFixed(0)}%
-                  </strong>
-                </div>
-
-                <div className="reasoning">
-                  <strong>AI reasoning</strong>
 
                   <p>
-                    {suggestion.reasoning}
+                    <b>Direction:</b>{" "}
+                    {suggestion.direction}
                   </p>
+
+                  <div className="confidence">
+                    Confidence:{" "}
+                    <strong>
+                      {(
+                        suggestion.confidence *
+                        100
+                      ).toFixed(0)}
+                      %
+                    </strong>
+                  </div>
+
+                  <div className="reasoning">
+
+                    <strong>
+                      AI reasoning
+                    </strong>
+
+                    <p>
+                      {suggestion.reasoning}
+                    </p>
+
+                  </div>
+
+                  <div className="buttons">
+
+                    <button
+                      onClick={() =>
+                        updatePricing(
+                          suggestion.id,
+                          true
+                        )
+                      }
+                    >
+                      ✓ Accept Price
+                    </button>
+
+                    <button
+                      className="reject"
+                      onClick={() =>
+                        updatePricing(
+                          suggestion.id,
+                          false
+                        )
+                      }
+                    >
+                      ✕ Reject
+                    </button>
+
+                  </div>
+
                 </div>
-
-                <div className="buttons">
-
-                  <button
-                    onClick={() =>
-                      updatePricing(
-                        suggestion.id,
-                        true
-                      )
-                    }
-                  >
-                    Accept Price
-                  </button>
-
-                  <button
-                    className="reject"
-                    onClick={() =>
-                      updatePricing(
-                        suggestion.id,
-                        false
-                      )
-                    }
-                  >
-                    Reject
-                  </button>
-
-                </div>
-
-              </div>
-
-            ))}
+              )
+            )}
 
           </div>
         )}
 
-        {/* REORDER */}
+        {/* ================= REORDER ================= */}
 
         {pendingReorder.length > 0 && (
           <div className="recommendation-group">
@@ -466,118 +649,142 @@ function App() {
               📦 Reorder Recommendations
             </h3>
 
-            {pendingReorder.map((suggestion) => (
+            {pendingReorder.map(
+              (suggestion) => (
 
-              <div
-                className="suggestion recommendation-card"
-                key={suggestion.id}
-              >
+                <div
+                  className="suggestion recommendation-card"
+                  key={suggestion.id}
+                >
 
-                <div className="recommendation-header">
+                  <div className="recommendation-header">
 
-                  <div>
-                    <h3>
-                      {suggestion.product.name}
-                    </h3>
+                    <div>
 
-                    <span className="trigger">
-                      {triggerLabel(
-                        suggestion.triggerReason
-                      )}
+                      <h3>
+                        {suggestion.product.name}
+                      </h3>
+
+                      <TriggerBadges
+                        triggerReason={
+                          suggestion.triggerReason
+                        }
+                      />
+
+                    </div>
+
+                    <span className="pending-label">
+                      PENDING
                     </span>
+
                   </div>
 
-                  <span className="pending-label">
-                    PENDING
-                  </span>
+                  <div className="reorder-number">
 
-                </div>
+                    <span>
+                      Recommended quantity
+                    </span>
 
-                <div className="reorder-number">
-
-                  <span>Recommended quantity</span>
-
-                  <strong>
-                    {suggestion.recommendedQuantity}
-                  </strong>
-
-                  <span>units</span>
-
-                </div>
-
-                <div className="stats">
-
-                  <div>
-                    <span>Current stock</span>
                     <strong>
-                      {suggestion.currentStock}
+                      {suggestion.recommendedQuantity}
                     </strong>
+
+                    <span>
+                      units
+                    </span>
+
                   </div>
 
-                  <div>
-                    <span>Lead time</span>
+                  <div className="stats">
+
+                    <div>
+                      <span>
+                        Current stock
+                      </span>
+
+                      <strong>
+                        {suggestion.currentStock}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Lead time
+                      </span>
+
+                      <strong>
+                        {
+                          suggestion.suggestedLeadTimeDays
+                        }{" "}
+                        days
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>
+                        Confidence
+                      </span>
+
+                      <strong>
+                        {(
+                          suggestion.confidence *
+                          100
+                        ).toFixed(0)}
+                        %
+                      </strong>
+                    </div>
+
+                  </div>
+
+                  <div className="reasoning">
+
                     <strong>
-                      {suggestion.suggestedLeadTimeDays} days
+                      AI reasoning
                     </strong>
+
+                    <p>
+                      {suggestion.reasoning}
+                    </p>
+
                   </div>
 
-                  <div>
-                    <span>Confidence</span>
-                    <strong>
-                      {(suggestion.confidence * 100).toFixed(
-                        0
-                      )}
-                      %
-                    </strong>
+                  <div className="buttons">
+
+                    <button
+                      onClick={() =>
+                        updateReorder(
+                          suggestion.id,
+                          true
+                        )
+                      }
+                    >
+                      ✓ Accept Reorder
+                    </button>
+
+                    <button
+                      className="reject"
+                      onClick={() =>
+                        updateReorder(
+                          suggestion.id,
+                          false
+                        )
+                      }
+                    >
+                      ✕ Reject
+                    </button>
+
                   </div>
 
                 </div>
-
-                <div className="reasoning">
-                  <strong>AI reasoning</strong>
-
-                  <p>
-                    {suggestion.reasoning}
-                  </p>
-                </div>
-
-                <div className="buttons">
-
-                  <button
-                    onClick={() =>
-                      updateReorder(
-                        suggestion.id,
-                        true
-                      )
-                    }
-                  >
-                    Accept Reorder
-                  </button>
-
-                  <button
-                    className="reject"
-                    onClick={() =>
-                      updateReorder(
-                        suggestion.id,
-                        false
-                      )
-                    }
-                  >
-                    Reject
-                  </button>
-
-                </div>
-
-              </div>
-
-            ))}
+              )
+            )}
 
           </div>
         )}
 
       </section>
 
-      {/* HISTORY */}
+      {/* ================= HISTORY ================= */}
 
       {(historyPricing.length > 0 ||
         historyReorder.length > 0) && (
@@ -587,76 +794,102 @@ function App() {
           <div className="section-header">
 
             <div>
-              <h2>History</h2>
+
+              <h2>
+                History
+              </h2>
 
               <p>
                 Previously processed recommendations
               </p>
+
             </div>
 
           </div>
 
           <div className="history-grid">
 
-            {historyPricing.map((suggestion) => (
+            {historyPricing.map(
+              (suggestion) => (
 
-              <div
-                className="history-card"
-                key={suggestion.id}
-              >
-
-                <div>
-                  <strong>
-                    💰 {suggestion.product.name}
-                  </strong>
-
-                  <p>
-                    Price recommendation
-                  </p>
-                </div>
-
-                <span
-                  className={`history-status ${suggestion.status}`}
+                <div
+                  className="history-card"
+                  key={suggestion.id}
                 >
-                  {suggestion.status}
-                </span>
 
-              </div>
+                  <div>
 
-            ))}
+                    <strong>
+                      💰{" "}
+                      {suggestion.product.name}
+                    </strong>
 
-            {historyReorder.map((suggestion) => (
+                    <p>
+                      Price recommendation
+                    </p>
 
-              <div
-                className="history-card"
-                key={suggestion.id}
-              >
+                    <TriggerBadges
+                      triggerReason={
+                        suggestion.triggerReason
+                      }
+                    />
 
-                <div>
-                  <strong>
-                    📦 {suggestion.product.name}
-                  </strong>
+                  </div>
 
-                  <p>
-                    Reorder:{" "}
-                    {suggestion.recommendedQuantity} units
-                  </p>
+                  <span
+                    className={`history-status ${suggestion.status}`}
+                  >
+                    {suggestion.status}
+                  </span>
+
                 </div>
+              )
+            )}
 
-                <span
-                  className={`history-status ${suggestion.status}`}
+            {historyReorder.map(
+              (suggestion) => (
+
+                <div
+                  className="history-card"
+                  key={suggestion.id}
                 >
-                  {suggestion.status}
-                </span>
 
-              </div>
+                  <div>
 
-            ))}
+                    <strong>
+                      📦{" "}
+                      {suggestion.product.name}
+                    </strong>
+
+                    <p>
+                      Reorder:{" "}
+                      {
+                        suggestion.recommendedQuantity
+                      }{" "}
+                      units
+                    </p>
+
+                    <TriggerBadges
+                      triggerReason={
+                        suggestion.triggerReason
+                      }
+                    />
+
+                  </div>
+
+                  <span
+                    className={`history-status ${suggestion.status}`}
+                  >
+                    {suggestion.status}
+                  </span>
+
+                </div>
+              )
+            )}
 
           </div>
 
         </section>
-
       )}
 
     </div>

@@ -1,13 +1,14 @@
 package com.stockpulse.stockpulse.strategy;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stockpulse.stockpulse.ai.LLMGateway;
-import com.stockpulse.stockpulse.domain.Product;
 import com.stockpulse.stockpulse.domain.PricingSuggestion;
+import com.stockpulse.stockpulse.domain.Product;
 import com.stockpulse.stockpulse.domain.ReorderSuggestion;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Component;
 
 @Component("AI")
 public class AICommerceStrategy implements CommerceStrategy {
@@ -75,6 +76,9 @@ public class AICommerceStrategy implements CommerceStrategy {
             );
 
             String response = llmGateway.callLLM(prompt);
+            System.out.println("===== LLM RESPONSE =====");
+            System.out.println(response);
+            System.out.println("========================");
 
             JsonNode json = mapper.readTree(cleanJson(response));
 
@@ -156,6 +160,9 @@ public class AICommerceStrategy implements CommerceStrategy {
             );
 
             String response = llmGateway.callLLM(prompt);
+            System.out.println("===== LLM RESPONSE =====");
+            System.out.println(response);
+            System.out.println("========================");
 
             JsonNode json = mapper.readTree(cleanJson(response));
 

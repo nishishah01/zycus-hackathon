@@ -1,15 +1,17 @@
 package com.stockpulse.stockpulse.service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.stockpulse.stockpulse.domain.PricingSuggestion;
 import com.stockpulse.stockpulse.domain.Product;
 import com.stockpulse.stockpulse.domain.ReorderSuggestion;
 import com.stockpulse.stockpulse.repository.PricingSuggestionRepository;
-import com.stockpulse.stockpulse.repository.ReorderSuggestionRepository;
 import com.stockpulse.stockpulse.repository.ProductRepository;
+import com.stockpulse.stockpulse.repository.ReorderSuggestionRepository;
 import com.stockpulse.stockpulse.strategy.CommerceStrategy;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 @Service
 public class RecommendationService {
@@ -142,6 +144,7 @@ public class RecommendationService {
             reorderRepository.save(suggestion);
         }
     }
+    @Transactional
 
     public PricingSuggestion acceptPricing(String id) {
 
@@ -184,6 +187,7 @@ public class RecommendationService {
 
         return pricingRepository.save(suggestion);
     }
+    @Transactional
 
     public ReorderSuggestion acceptReorder(String id) {
 
